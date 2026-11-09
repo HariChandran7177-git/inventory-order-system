@@ -1,0 +1,32 @@
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Git and Agent metadata
+.git/
+.gitignore
+.agents/
+.gemini/
+
+# Logs and runtime artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE configuration
+.vscode/
+.idea/
