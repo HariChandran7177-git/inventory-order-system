@@ -1,0 +1,128 @@
+/* Fast Cart - Custom Application Styling */
+
+:root {
+  --fc-primary: #0d6efd;
+  --fc-primary-hover: #0b5ed7;
+  --fc-dark: #212529;
+  --fc-light-bg: #f8f9fa;
+  --fc-border: #dee2e6;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--fc-light-bg);
+  color: var(--fc-dark);
+}
+
+/* Application layout container */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1 0 auto;
+}
+
+/* Navbar branding */
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  transition: color 0.15s ease-in-out;
+}
+
+.nav-link.active {
+  color: #fff !important;
+  font-weight: 600;
+}
+
+/* Storefront cards */
+.product-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.1) !important;
+}
+
+.product-card .card-img-placeholder {
+  height: 180px;
+  background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: #adb5bd;
+}
+
+.stock-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35em 0.65em;
+  border-radius: 50rem;
+}
+
+/* Sidebar for Admin */
+.admin-sidebar {
+  min-height: calc(100vh - 56px);
+  background-color: #fff;
+  border-right: 1px solid var(--fc-border);
+}
+
+.admin-sidebar .nav-link {
+  color: #495057;
+  padding: 0.6rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.admin-sidebar .nav-link:hover {
+  background-color: #f1f3f5;
+  color: #212529;
+}
+
+.admin-sidebar .nav-link.active {
+  background-color: var(--fc-primary);
+  color: #fff !important;
+}
+
+/* Cart Offcanvas Drawer */
+.cart-drawer {
+  width: 420px;
+  max-width: 95vw;
+}
+
+.cart-item-row {
+  border-bottom: 1px solid #e9ecef;
+  padding: 0.75rem 0;
+}
+
+.cart-item-row:last-child {
+  border-bottom: none;
+}
+
+/* Footer */
+.footer-custom {
+  background-color: #212529;
+  color: #adb5bd;
+  padding: 1.5rem 0;
+  margin-top: auto;
+}
