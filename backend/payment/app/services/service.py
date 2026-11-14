@@ -72,7 +72,8 @@ class OrderService:
             )
 
         unit_price = round(float(product["price"]), 2)
-        fee_per_unit = round(0.2 * unit_price, 2)
+        # 1.5% platform fee (unit_price is inclusive of 5% GST)
+        fee_per_unit = round(0.015 * unit_price, 2)
         total = round((unit_price + fee_per_unit) * int(order_req_dict["order_quantity"]), 2)
 
         order = Order(

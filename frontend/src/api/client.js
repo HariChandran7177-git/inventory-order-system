@@ -66,8 +66,9 @@ export const inventoryApi = {
     return request(`${INVENTORY_BASE_URL}/health`)
   },
 
-  async getProducts() {
-    return request(`${INVENTORY_BASE_URL}/inventory/products`)
+  async getProducts(category) {
+    const url = category ? `${INVENTORY_BASE_URL}/inventory/products?category=${encodeURIComponent(category)}` : `${INVENTORY_BASE_URL}/inventory/products`
+    return request(url)
   },
 
   async getProduct(pk) {
@@ -75,23 +76,25 @@ export const inventoryApi = {
     return request(`${INVENTORY_BASE_URL}/inventory/product/${pk}`)
   },
 
-  async createProduct({ name, price, quantity }) {
+  async createProduct({ name, price, quantity, category }) {
     return request(`${INVENTORY_BASE_URL}/inventory/product`, {
       method: "POST",
       body: JSON.stringify({
         name: String(name).trim(),
         price: parseFloat(price),
         quantity: parseInt(quantity, 10),
+        category: category ? String(category).trim() : undefined,
       }),
     })
   },
 
-  async updateProduct(pk, { name, price, quantity }) {
+  async updateProduct(pk, { name, price, quantity, category }) {
     if (!pk) throw new Error("Product primary key (pk) is required for update")
     const payload = {}
     if (name !== undefined) payload.name = String(name).trim()
     if (price !== undefined) payload.price = parseFloat(price)
     if (quantity !== undefined) payload.quantity = parseInt(quantity, 10)
+    if (category !== undefined) payload.category = String(category).trim()
 
     return request(`${INVENTORY_BASE_URL}/inventory/product/${pk}`, {
       method: "PUT",

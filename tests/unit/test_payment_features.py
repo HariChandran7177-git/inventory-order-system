@@ -25,8 +25,8 @@ def test_create_order_pending_lifecycle(integrated_client: TestClient, inventory
     assert data["product_id"] == prod["pk"]
     assert data["order_quantity"] == 2
     assert data["price"] == 250.0
-    assert data["fee_per_unit"] == 50.0  # 20% of 250
-    assert data["total"] == 600.0  # (250 + 50) * 2
+    assert data["fee_per_unit"] == 3.75  # 1.5% of 250
+    assert data["total"] == 507.50  # (250 + 3.75) * 2
 
 
 def test_get_order_by_id(payment_client: TestClient, mock_session: MockAsyncSession):

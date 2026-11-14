@@ -225,7 +225,7 @@ export const Orders = () => {
                   <th scope="col">Product ID</th>
                   <th scope="col" className="text-center">Quantity</th>
                   <th scope="col" className="text-end">Unit Price</th>
-                  <th scope="col" className="text-end">Fee/Unit (20%)</th>
+                  <th scope="col" className="text-end">Platform Fee (1.5%)</th>
                   <th scope="col" className="text-end">Total Amount</th>
                   <th scope="col" className="text-center">Status</th>
                   <th scope="col">Placed At</th>

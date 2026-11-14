@@ -51,8 +51,8 @@ def test_full_customer_shopping_journey(
     assert order["status"] == "pending"
     assert order["order_quantity"] == 2
     assert order["price"] == 499.99
-    assert order["fee_per_unit"] == 100.00  # 20% of 499.99 is 99.998 -> rounded to 100.00
-    assert order["total"] == 1199.98  # (499.99 + 100.00) * 2
+    assert order["fee_per_unit"] == 7.50  # 1.5% of 499.99 is 7.49985 -> rounded to 7.50
+    assert order["total"] == 1014.98  # (499.99 + 7.50) * 2
 
     order_id = order["order_id"]
 
@@ -186,8 +186,8 @@ def test_multi_item_independent_orders_flow(
     order_b = order_b_res.json()
 
     assert order_a["order_id"] != order_b["order_id"]
-    assert order_a["total"] == 72.0  # (30 + 6) * 2
-    assert order_b["total"] == 216.0  # (60 + 12) * 3
+    assert order_a["total"] == 60.90  # (30 + 0.45) * 2
+    assert order_b["total"] == 182.70  # (60 + 0.90) * 3
 
 
 def test_order_resilience_to_malformed_inventory_response(

@@ -13,7 +13,9 @@ export const CartDrawer = () => {
     removeFromCart,
     clearCart,
     subtotal,
-    estimatedFee,
+    subtotalWithoutGst,
+    includedGst,
+    platformFee,
     grandTotal,
   } = useCart()
 
@@ -225,15 +227,23 @@ export const CartDrawer = () => {
         {!completedOrders && cartItems.length > 0 && (
           <div className="border-top p-3 bg-light">
             <div className="d-flex justify-content-between small text-muted mb-1">
-              <span>Subtotal</span>
+              <span>Price (excl. 5% GST)</span>
+              <span>{formatPrice(subtotalWithoutGst)}</span>
+            </div>
+            <div className="d-flex justify-content-between small text-muted mb-1">
+              <span>Included 5% GST</span>
+              <span className="text-secondary">{formatPrice(includedGst)}</span>
+            </div>
+            <div className="d-flex justify-content-between small fw-semibold text-dark mb-1 pt-1 border-top">
+              <span>Main Price (incl. GST)</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
             <div className="d-flex justify-content-between small text-muted mb-2">
-              <span>Est. Processing Fee (20%)</span>
-              <span>{formatPrice(estimatedFee)}</span>
+              <span>Platform Fee (1.5%)</span>
+              <span>{formatPrice(platformFee)}</span>
             </div>
             <div className="d-flex justify-content-between fw-bold fs-5 border-top pt-2 mb-3">
-              <span>Total</span>
+              <span>Total Price</span>
               <span className="text-primary">{formatPrice(grandTotal)}</span>
             </div>
             <button

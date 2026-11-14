@@ -57,7 +57,8 @@ export const Products = () => {
       const q = searchQuery.toLowerCase()
       return (
         product.name?.toLowerCase().includes(q) ||
-        product.id?.toLowerCase().includes(q)
+        product.id?.toLowerCase().includes(q) ||
+        product.category?.toLowerCase().includes(q)
       )
     })
   }, [products, searchQuery])
@@ -160,6 +161,7 @@ export const Products = () => {
                 <tr>
                   <th scope="col" className="ps-3"># Primary Key</th>
                   <th scope="col">Product Name</th>
+                  <th scope="col">Category</th>
                   <th scope="col" className="text-end">Unit Price</th>
                   <th scope="col" className="text-center">Stock Quantity</th>
                   <th scope="col">Registered Time</th>
@@ -176,6 +178,11 @@ export const Products = () => {
                       </td>
                       <td className="fw-semibold text-dark">
                         {product.name}
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-dark border">
+                          {product.category || "Uncategorized"}
+                        </span>
                       </td>
                       <td className="text-end fw-bold text-primary">
                         {formatPrice(product.price)}

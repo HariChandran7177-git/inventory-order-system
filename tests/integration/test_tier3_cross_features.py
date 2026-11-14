@@ -162,8 +162,8 @@ def test_update_product_price_propagates_to_new_order_fees(
     assert order_res.status_code == 200
     data = order_res.json()
     assert data["price"] == 20.0
-    assert data["fee_per_unit"] == 4.0  # 20% of 20
-    assert data["total"] == 48.0  # (20 + 4) * 2
+    assert data["fee_per_unit"] == 0.30  # 1.5% of 20
+    assert data["total"] == 40.60  # (20 + 0.30) * 2
 
 
 def test_cache_invalidation_after_product_update(

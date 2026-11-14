@@ -7,6 +7,7 @@ export const ProductsCreate = () => {
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [quantity, setQuantity] = useState("")
+  const [category, setCategory] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
   const navigate = useNavigate()
@@ -38,6 +39,7 @@ export const ProductsCreate = () => {
         name: name.trim(),
         price: parsedPrice,
         quantity: parsedQuantity,
+        category: category.trim() || "Uncategorized",
       })
 
       // Navigate safely to admin inventory list
@@ -92,6 +94,17 @@ export const ProductsCreate = () => {
                     onChange={e => setName(e.target.value)}
                   />
                   <label htmlFor="new-prod-name">Product Name</label>
+                </div>
+
+                <div className="form-floating mb-3">
+                  <input
+                    id="new-prod-category"
+                    className="form-control"
+                    placeholder="Category"
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
+                  />
+                  <label htmlFor="new-prod-category">Category (e.g. Electronics, Clothing)</label>
                 </div>
 
                 <div className="form-floating mb-3">

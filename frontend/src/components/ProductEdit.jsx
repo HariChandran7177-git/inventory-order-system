@@ -10,6 +10,7 @@ export const ProductEdit = () => {
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [quantity, setQuantity] = useState("")
+  const [category, setCategory] = useState("")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
@@ -23,6 +24,7 @@ export const ProductEdit = () => {
           setName(product.name || "")
           setPrice(product.price !== undefined ? String(product.price) : "")
           setQuantity(product.quantity !== undefined ? String(product.quantity) : "")
+          setCategory(product.category || "")
         }
       } catch (err) {
         if (isMounted) {
@@ -66,6 +68,7 @@ export const ProductEdit = () => {
         name: name.trim(),
         price: parsedPrice,
         quantity: parsedQuantity,
+        category: category.trim() || "Uncategorized",
       })
       navigate("/admin")
     } catch (err) {
@@ -126,6 +129,17 @@ export const ProductEdit = () => {
                       onChange={e => setName(e.target.value)}
                     />
                     <label htmlFor="edit-prod-name">Product Name</label>
+                  </div>
+
+                  <div className="form-floating mb-3">
+                    <input
+                      id="edit-prod-category"
+                      className="form-control"
+                      placeholder="Category"
+                      value={category}
+                      onChange={e => setCategory(e.target.value)}
+                    />
+                    <label htmlFor="edit-prod-category">Category (e.g. Electronics, Clothing)</label>
                   </div>
 
                   <div className="form-floating mb-3">

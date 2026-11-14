@@ -15,14 +15,18 @@ class Order(SQLModel, table=True):  # type: ignore
     """
     # * auto-incrementing primary key, handled by SQLModel
     # * using int for simplicity, but can be changed to UUID if needed
-    order_id: Optional[int] = Field(default=None, primary_key=True, index=True, description="Unique order ID")
+    order_id: Optional[int] = Field(
+        default=None, primary_key=True, index=True, description="Unique order ID")
     # id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True, description="Unique order ID")
-    product_id: str = Field(index=True, description="Unique identifier for the product")
+    product_id: str = Field(
+        index=True, description="Unique identifier for the product")
     price: float = Field(..., description="Price of the product")
-    fee_per_unit: float = Field(..., description="Fee for the product")
+    fee_per_unit: float = Field(...,
+                                description="Platform fee for the product (1.5%)")
     total: float = Field(..., description="Total amount for the product")
     order_quantity: int = Field(..., description="Quantity of the product")
-    status: str = Field(..., description="Status of the order (e.g., pending, completed)")
+    status: str = Field(...,
+                        description="Status of the order (e.g., pending, completed)")
     created_at: str = Field(
         default_factory=lambda: datetime.datetime.now().isoformat(), description="Timestamp when the order was created"
     )
@@ -31,9 +35,9 @@ class Order(SQLModel, table=True):  # type: ignore
         json_schema_extra = {
             "example": {
                 "product_id": "12345",
-                "price": 19.99,
-                "fee_per_unit": 1.99,
-                "total": 21.98,
+                "price": 100.00,
+                "fee_per_unit": 1.50,
+                "total": 203.00,
                 "order_quantity": 2,
                 "status": "pending",
             }
@@ -45,12 +49,17 @@ class UpdateOrder(SQLModel):
     Represents an update to an existing order.
     """
 
-    product_id: Optional[str] = Field(None, description="Unique identifier for the product")
+    product_id: Optional[str] = Field(
+        None, description="Unique identifier for the product")
     price: Optional[float] = Field(None, description="Price of the product")
-    fee_per_unit: Optional[float] = Field(None, description="Fee for the product")
-    total: Optional[float] = Field(None, description="Total amount for the product")
-    order_quantity: Optional[int] = Field(None, description="Quantity of the product")
-    status: Optional[str] = Field(None, description="Status of the order (e.g., pending, completed)")
+    fee_per_unit: Optional[float] = Field(
+        None, description="Fee for the product")
+    total: Optional[float] = Field(
+        None, description="Total amount for the product")
+    order_quantity: Optional[int] = Field(
+        None, description="Quantity of the product")
+    status: Optional[str] = Field(
+        None, description="Status of the order (e.g., pending, completed)")
 
     class Config:
         json_schema_extra = {
@@ -88,8 +97,10 @@ class OrderRequest(BaseModel):
     Represents a request to create an order.
     """
 
-    product_id: str = pydantic.Field(..., description="Unique identifier for the product")
-    order_quantity: int = pydantic.Field(..., gt=0, description="Quantity of the product")
+    product_id: str = pydantic.Field(...,
+                                     description="Unique identifier for the product")
+    order_quantity: int = pydantic.Field(...,
+                                         gt=0, description="Quantity of the product")
 
     model_config = {
         "json_schema_extra": {

@@ -96,6 +96,7 @@ async def product_format(pk: str) -> dict[str, str | float | int] | None:
             "price": product.price,
             "quantity": product.quantity,
             "creation_time": product.creation_time,
+            "category": getattr(product, "category", "Uncategorized"),
         }
     except NotFoundError:
         return None

@@ -53,19 +53,44 @@ export function parseQuantity(value, defaultValue = 0) {
 }
 
 /**
- * Calculate the exact fee matching backend logic (20% fee rounded to 2 decimal places).
+ * Calculate the price without 5% GST (GST is included in main unitPrice).
+ * Formula: unitPrice / (1 + 0.05)
  */
-export function calculateFeePerUnit(unitPrice, rate = 0.2) {
+export function calculatePriceWithoutGst(unitPrice, gstRate = 0.05) {
+  const price = typeof unitPrice === "number" ? unitPrice : parseFloat(unitPrice) || 0
+  return Math.round((price / (1 + gstRate)) * 100) / 100
+}
+
+/**
+ * Calculate the included 5% GST amount from the main price.
+ */
+export function calculateGstAmount(unitPrice, gstRate = 0.05) {
+  const price = typeof unitPrice === "number" ? unitPrice : parseFloat(unitPrice) || 0
+  const priceWithoutGst = calculatePriceWithoutGst(price, gstRate)
+  return Math.round((price - priceWithoutGst) * 100) / 100
+}
+
+/**
+ * Calculate the 1.5% platform fee matching backend logic.
+ */
+export function calculatePlatformFee(unitPrice, rate = 0.015) {
   const price = typeof unitPrice === "number" ? unitPrice : parseFloat(unitPrice) || 0
   return Math.round(price * rate * 100) / 100
 }
 
 /**
- * Calculate total for an order (unit_price + fee_per_unit) * quantity.
+ * Alias for calculatePlatformFee to maintain backward compatibility.
  */
-export function calculateOrderTotal(unitPrice, quantity = 1, rate = 0.2) {
+export function calculateFeePerUnit(unitPrice, rate = 0.015) {
+  return calculatePlatformFee(unitPrice, rate)
+}
+
+/**
+ * Calculate total for an order: (main_unit_price + 1.5% platform_fee) * quantity.
+ */
+export function calculateOrderTotal(unitPrice, quantity = 1, rate = 0.015) {
   const price = typeof unitPrice === "number" ? unitPrice : parseFloat(unitPrice) || 0
-  const fee = calculateFeePerUnit(price, rate)
+  const fee = calculatePlatformFee(price, rate)
   const qty = parseQuantity(quantity, 1)
   return Math.round((price + fee) * qty * 100) / 100
 }

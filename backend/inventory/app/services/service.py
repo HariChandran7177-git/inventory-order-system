@@ -53,6 +53,7 @@ class Service:
                             "name": product.name,
                             "price": float(product.price),
                             "quantity": int(product.quantity),
+                            "category": getattr(product, "category", "Uncategorized"),
                             "creation_time": str(product.creation_time),
                         }
                     )
@@ -63,6 +64,7 @@ class Service:
                             "name": str(data.get("name", "")),
                             "price": float(data.get("price", 0.0)),
                             "quantity": int(data.get("quantity", 0)),
+                            "category": str(data.get("category", "Uncategorized")),
                             "creation_time": str(data.get("creation_time", "")),
                         }
                     )
@@ -70,6 +72,12 @@ class Service:
         except Exception as e:
             logger.warning(f"Batch loading failed, falling back to individual fetches: {e}")
             return [result for pk in pks if isinstance((result := await product_format(pk)), dict)]
+
+    async def get_products_by_category(self, category: str) -> list[dict[str, str | float | int]]:
+        """Fetch products filtered by a given category."""
+        # Simple implementation: fetch all then filter (could be optimized)
+        all_products = await self.get_all_products()
+        return [p for p in all_products if p.get("category") == category]
 
     async def add_product(self, product: Product) -> Product:
         """

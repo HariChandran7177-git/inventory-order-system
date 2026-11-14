@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Wrapper } from "./wrapper"
 import { inventoryApi } from "../api/client"
 import { useCart } from "../context/CartContext"
-import { formatDate, formatPrice, parseQuantity } from "../utils/formatters"
+import { formatDate, formatPrice, parseQuantity, calculatePriceWithoutGst, calculateGstAmount, calculatePlatformFee, calculateOrderTotal } from "../utils/formatters"
 
 export const ProductsStore = () => {
   const [products, setProducts] = useState([])
@@ -12,6 +12,7 @@ export const ProductsStore = () => {
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState("")
   const [stockFilter, setStockFilter] = useState("all") // 'all' | 'in_stock' | 'out_of_stock'
+  const [selectedCategory, setSelectedCategory] = useState("all") // 'all' | category name
   const [sortBy, setSortBy] = useState("name_asc") // 'name_asc' | 'price_asc' | 'price_desc' | 'stock_desc'
 
   // Per-product selected quantity for Add to Cart
@@ -68,15 +69,29 @@ export const ProductsStore = () => {
     }
   }
 
+  // Distinct categories from products
+  const categories = useMemo(() => {
+    const set = new Set()
+    products.forEach(p => {
+      if (p.category && p.category.trim()) {
+        set.add(p.category.trim())
+      }
+    })
+    return ["all", ...Array.from(set)]
+  }, [products])
+
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
     return products
       .filter(p => {
-        const matchesName = p.name?.toLowerCase().includes(searchTerm.toLowerCase().trim())
+        const q = searchTerm.toLowerCase().trim()
+        const matchesName = !q || p.name?.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q)
+        const itemCategory = (p.category && p.category.trim()) || "Uncategorized"
+        const matchesCategory = selectedCategory === "all" || itemCategory.toLowerCase() === selectedCategory.toLowerCase()
         const qty = parseQuantity(p.quantity, 0)
-        if (stockFilter === "in_stock") return matchesName && qty > 0
-        if (stockFilter === "out_of_stock") return matchesName && qty <= 0
-        return matchesName
+        if (stockFilter === "in_stock") return matchesName && matchesCategory && qty > 0
+        if (stockFilter === "out_of_stock") return matchesName && matchesCategory && qty <= 0
+        return matchesName && matchesCategory
       })
       .sort((a, b) => {
         if (sortBy === "price_asc") return (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0)
@@ -84,7 +99,7 @@ export const ProductsStore = () => {
         if (sortBy === "stock_desc") return parseQuantity(b.quantity, 0) - parseQuantity(a.quantity, 0)
         return (a.name || "").localeCompare(b.name || "")
       })
-  }, [products, searchTerm, stockFilter, sortBy])
+  }, [products, searchTerm, stockFilter, selectedCategory, sortBy])
 
   return (
     <Wrapper>
@@ -207,6 +222,29 @@ export const ProductsStore = () => {
               </select>
             </div>
           </div>
+
+          {/* Category Filter Pills */}
+          {categories.length > 1 && (
+            <div className="d-flex flex-wrap align-items-center gap-2 mt-3 pt-2 border-top">
+              <span className="small text-muted fw-semibold me-1">
+                <i className="bi bi-tag me-1"></i>Categories:
+              </span>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`btn btn-sm ${
+                    selectedCategory.toLowerCase() === cat.toLowerCase()
+                      ? "btn-dark"
+                      : "btn-outline-secondary"
+                  } rounded-pill px-3 py-1`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat === "all" ? "All Categories" : cat}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Error Alert */}
@@ -282,18 +320,25 @@ export const ProductsStore = () => {
                       <h5 className="card-title text-truncate fw-bold mb-1" title={product.name}>
                         {product.name}
                       </h5>
-                      <div className="text-muted small mb-2">
-                        ID: <span className="text-secondary font-monospace">{product.id.slice(0, 12)}...</span>
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="badge bg-light text-secondary border small">
+                          <i className="bi bi-tag me-1"></i>{product.category || "Uncategorized"}
+                        </span>
+                        <span className="text-muted font-monospace small">{product.id.slice(0, 8)}...</span>
                       </div>
 
                       <div className="mt-auto pt-2">
-                        <div className="d-flex align-items-baseline justify-content-between mb-3">
+                        <div className="d-flex align-items-baseline justify-content-between mb-1">
                           <span className="fs-4 fw-bold text-primary">
                             {formatPrice(product.price)}
                           </span>
-                          <span className="text-muted small">
-                            +20% fee at checkout
+                          <span className="text-secondary small">
+                            (incl. 5% GST)
                           </span>
+                        </div>
+                        <div className="d-flex justify-content-between small text-muted mb-3">
+                          <span>Excl. GST: {formatPrice(calculatePriceWithoutGst(product.price))}</span>
+                          <span>+1.5% platform fee</span>
                         </div>
 
                         {/* Quantity picker & Actions */}
@@ -389,22 +434,31 @@ export const ProductsStore = () => {
                     </span>
                   </div>
                   <dl className="row small">
+                    <dt className="col-sm-4 text-muted">Category:</dt>
+                    <dd className="col-sm-8 fw-semibold">{selectedProduct.category || "Uncategorized"}</dd>
+
                     <dt className="col-sm-4 text-muted">Primary Key (PK):</dt>
                     <dd className="col-sm-8 font-monospace">{selectedProduct.id}</dd>
 
-                    <dt className="col-sm-4 text-muted">Unit Price:</dt>
+                    <dt className="col-sm-4 text-muted">Price (excl. GST):</dt>
+                    <dd className="col-sm-8">{formatPrice(calculatePriceWithoutGst(selectedProduct.price))}</dd>
+
+                    <dt className="col-sm-4 text-muted">Included 5% GST:</dt>
+                    <dd className="col-sm-8 text-secondary">{formatPrice(calculateGstAmount(selectedProduct.price))}</dd>
+
+                    <dt className="col-sm-4 text-muted">Main Price (incl. GST):</dt>
                     <dd className="col-sm-8 fw-bold text-primary fs-6">
                       {formatPrice(selectedProduct.price)}
                     </dd>
 
-                    <dt className="col-sm-4 text-muted">Estimated Fee (20%):</dt>
+                    <dt className="col-sm-4 text-muted">Platform Fee (1.5%):</dt>
                     <dd className="col-sm-8 text-secondary">
-                      {formatPrice((parseFloat(selectedProduct.price) || 0) * 0.2)}
+                      {formatPrice(calculatePlatformFee(selectedProduct.price))}
                     </dd>
 
                     <dt className="col-sm-4 text-muted">Total Per Unit:</dt>
-                    <dd className="col-sm-8 fw-semibold">
-                      {formatPrice((parseFloat(selectedProduct.price) || 0) * 1.2)}
+                    <dd className="col-sm-8 fw-semibold text-primary">
+                      {formatPrice(calculateOrderTotal(selectedProduct.price, 1))}
                     </dd>
 
                     <dt className="col-sm-4 text-muted">Registered On:</dt>

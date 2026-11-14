@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 
 from inventory.app.models.models import Product, UpdateProduct
@@ -14,11 +16,14 @@ inventory_service = Service()
 
 
 @router.get("/products", response_model=list[dict[str, str | float | int]])
-async def get_all_products() -> list[dict[str, str | float | int]]:
+async def get_all_products(category: Optional[str] = None) -> list[dict[str, str | float | int]]:
     """
-    Get all products from the database
+    Get all products, optionally filtered by category.
     """
-    products = await inventory_service.get_all_products()
+    if category:
+        products = await inventory_service.get_products_by_category(category)
+    else:
+        products = await inventory_service.get_all_products()
     if isinstance(products, list):
         return list(products)
     raise HTTPException(status_code=500, detail="Expected a list of products, but received invalid format.")

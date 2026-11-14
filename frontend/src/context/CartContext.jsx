@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react"
-import { calculateFeePerUnit, parseQuantity } from "../utils/formatters"
+import {
+  calculateGstAmount,
+  calculatePlatformFee,
+  calculatePriceWithoutGst,
+  parseQuantity,
+} from "../utils/formatters"
 
 const CartContext = createContext(null)
 
@@ -86,17 +91,31 @@ export const CartProvider = ({ children }) => {
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
+  // Subtotal in main prices (which include 5% GST)
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   )
 
-  const estimatedFee = cartItems.reduce(
-    (sum, item) => sum + calculateFeePerUnit(item.price) * item.quantity,
+  // Subtotal without 5% GST
+  const subtotalWithoutGst = cartItems.reduce(
+    (sum, item) => sum + calculatePriceWithoutGst(item.price) * item.quantity,
     0
   )
 
-  const grandTotal = subtotal + estimatedFee
+  // 5% GST amount included in the main price
+  const includedGst = cartItems.reduce(
+    (sum, item) => sum + calculateGstAmount(item.price) * item.quantity,
+    0
+  )
+
+  // 1.5% platform fee added at checkout
+  const platformFee = cartItems.reduce(
+    (sum, item) => sum + calculatePlatformFee(item.price) * item.quantity,
+    0
+  )
+
+  const grandTotal = subtotal + platformFee
 
   return (
     <CartContext.Provider
@@ -110,7 +129,10 @@ export const CartProvider = ({ children }) => {
         clearCart,
         totalItems,
         subtotal,
-        estimatedFee,
+        subtotalWithoutGst,
+        includedGst,
+        platformFee,
+        estimatedFee: platformFee, // backward-compatibility
         grandTotal,
       }}
     >

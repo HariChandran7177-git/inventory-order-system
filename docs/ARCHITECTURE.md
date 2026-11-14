@@ -62,7 +62,7 @@ sequenceDiagram
   IW->>IW: atomic Lua stock decrement
 ```
 
-An order request is validated against the current inventory response, priced with a 20% fee, persisted as `pending`, and then asynchronously processed. The code uses separate PostgreSQL and Redis operations, so this is eventual consistency and is not an exactly-once transaction. There is no transactional outbox. The UI cart is stored in browser localStorage and does not reserve stock. The inventory worker performs the actual decrement after completion; concurrent orders can therefore encounter stock conflicts after the order was initially accepted.
+An order request is validated against the current inventory response, priced with a 1.5% platform fee (with 5% tax/GST included in the base product price), persisted as `pending`, and then asynchronously processed. The code uses separate PostgreSQL and Redis operations, so this is eventual consistency and is not an exactly-once transaction. There is no transactional outbox. The UI cart is stored in browser localStorage and does not reserve stock. The inventory worker performs the actual decrement after completion; concurrent orders can therefore encounter stock conflicts after the order was initially accepted.
 
 ## API and data boundaries
 
