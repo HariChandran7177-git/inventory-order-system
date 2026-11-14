@@ -7,7 +7,14 @@ from sqlalchemy import update
 from sqlmodel import select
 
 from payment.app.db.postgresql import SessionDep
-from payment.app.models.models import Order, OrderRequest, UpdateOrder
+from payment.app.models.models import (
+    CheckoutItemValidation,
+    CheckoutValidationResponse,
+    ItemValidationResult,
+    Order,
+    OrderRequest,
+    UpdateOrder,
+)
 
 INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://127.0.0.1:8000").rstrip("/")
 
@@ -187,3 +194,106 @@ class OrderService:
         await session.delete(order)
         await session.commit()
         return order_dict
+
+    @staticmethod
+    async def validate_checkout_items(items: list[CheckoutItemValidation]) -> CheckoutValidationResponse:
+        """
+        Validates a list of cart items against the live Inventory Service before payment.
+        Checks:
+        1. Stock availability (sufficient vs insufficient vs out-of-stock).
+        2. Price changes (price hike vs price drop vs unchanged).
+        Computes updated totals (base price, 1.5% platform fee).
+        """
+        validation_results: list[ItemValidationResult] = []
+        updated_subtotal = 0.0
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for item in items:
+                product_url = f"{INVENTORY_SERVICE_URL}/inventory/product/{item.product_id}"
+                try:
+                    res = await client.get(product_url)
+                except httpx.RequestError as exc:
+                    logger.error(f"Failed to reach inventory service for item {item.product_id}: {exc}")
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Unable to connect to inventory service at {INVENTORY_SERVICE_URL}",
+                    )
+
+                if res.status_code == 404:
+                    validation_results.append(
+                        ItemValidationResult(
+                            product_id=item.product_id,
+                            name="Unknown Product",
+                            requested_quantity=item.order_quantity,
+                            available_stock=0,
+                            has_sufficient_stock=False,
+                            client_price=item.client_price,
+                            current_price=item.client_price,
+                            price_difference=0.0,
+                            price_change_type="none",
+                            status="not_found",
+                        )
+                    )
+                    continue
+
+                if res.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Inventory service returned status code {res.status_code} during validation",
+                    )
+
+                prod = res.json()
+                current_stock = int(prod.get("quantity", 0))
+                current_price = round(float(prod.get("price", item.client_price)), 2)
+                prod_name = str(prod.get("name", "Product"))
+                has_sufficient_stock = current_stock >= item.order_quantity
+
+                # Compare prices
+                price_diff = round(current_price - round(float(item.client_price), 2), 2)
+                if price_diff > 0.001:
+                    price_change_type = "hike"
+                elif price_diff < -0.001:
+                    price_change_type = "drop"
+                else:
+                    price_change_type = "none"
+
+                if not has_sufficient_stock:
+                    status = "insufficient_stock"
+                elif price_change_type != "none":
+                    status = "price_changed"
+                else:
+                    status = "ok"
+
+                validation_results.append(
+                    ItemValidationResult(
+                        product_id=item.product_id,
+                        name=prod_name,
+                        requested_quantity=item.order_quantity,
+                        available_stock=current_stock,
+                        has_sufficient_stock=has_sufficient_stock,
+                        client_price=item.client_price,
+                        current_price=current_price,
+                        price_difference=price_diff,
+                        price_change_type=price_change_type,
+                        status=status,
+                    )
+                )
+                updated_subtotal += current_price * item.order_quantity
+
+        updated_subtotal = round(updated_subtotal, 2)
+        updated_platform_fee = round(0.015 * updated_subtotal, 2)
+        updated_total = round(updated_subtotal + updated_platform_fee, 2)
+
+        has_stock_issues = any(not r.has_sufficient_stock for r in validation_results)
+        has_price_changes = any(r.price_change_type != "none" for r in validation_results)
+        is_valid = not has_stock_issues and not has_price_changes
+
+        return CheckoutValidationResponse(
+            is_valid=is_valid,
+            has_stock_issues=has_stock_issues,
+            has_price_changes=has_price_changes,
+            items=validation_results,
+            updated_subtotal=updated_subtotal,
+            updated_platform_fee=updated_platform_fee,
+            updated_total=updated_total,
+        )

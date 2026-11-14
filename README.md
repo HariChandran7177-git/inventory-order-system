@@ -4,7 +4,7 @@
 
 ### _Event-Driven Distributed Microservices Platform_
 
-[![Tests](<https://img.shields.io/badge/Tests-64%2F64%20Passing%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white>)](#-testing--quality-assurance)
+[![Tests](<https://img.shields.io/badge/Tests-68%2F68%20Passing%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white>)](#-testing--quality-assurance)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -287,6 +287,7 @@ npm run dev:frontend
 | Method | Endpoint | Description | Status Codes |
 | :---: | :--- | :--- | :--- |
 | `GET` | `/health` | Service health probe | `200` |
+| `POST` | `/orders/validate` | Pre-payment validation (stock check & price hike/drop) | `200`, `502` |
 | `GET` | `/orders/` | List all orders from PostgreSQL | `200` |
 | `GET` | `/orders/{order_id}` | Retrieve single order details | `200`, `404` |
 | `POST` | `/orders/` | Place a new order (1.5% fee calculation) | `200`, `400`, `404`, `502` |
@@ -297,7 +298,7 @@ npm run dev:frontend
 
 ## 🧪 Testing & Quality Assurance
 
-The platform features an isolated **4-tier automated test suite** consisting of **64 tests** that execute in under 3 seconds using in-memory test doubles (**fakeredis** with **lupa** for real Lua execution and **MockAsyncSession** for SQLModel).
+The platform features an isolated **4-tier automated test suite** consisting of **68 tests** that execute in under 3 seconds using in-memory test doubles (**fakeredis** with **lupa** for real Lua execution and **MockAsyncSession** for SQLModel).
 
 Run the tests anytime without external databases:
 
@@ -349,9 +350,10 @@ tests\unit\test_tier2_boundaries.py ..........                           [100%]
 
 | Quality Metric | Status | Assessment |
 | :--- | :---: | :--- |
-| **Backend Test Suite** | `64 / 64 Passed` | 100% pass rate across all 4 tiers without live external daemons. |
+| **Backend Test Suite** | `68 / 68 Passed` | 100% pass rate across all 4 tiers without live external daemons. |
 | **Frontend Code Quality** | `0 Errors / Warnings` | Clean ESLint across all React 19 components and hooks. |
-| **Frontend Production Build** | `Passed (2.97s)` | Optimized Vite bundle with local Bootstrap 5.3 & Icons. |
+| **Frontend Production Build** | `Passed (3.22s)` | Optimized Vite bundle with local Bootstrap 5.3 & Icons. |
+| **Two-Step Checkout Flow** | `Stock & Price Gate` | Real-time validation detecting stock shortage, price hike, or price drop. |
 | **Concurrency & Integrity** | `Zero Overselling` | Concurrency-safe atomic Lua decrement and startup PEL recovery. |
 | **Interview Readiness** | `Complete` | Detailed architecture walkthrough, 30 Q&As, and elevator pitch ready. |
 

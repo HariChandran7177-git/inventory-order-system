@@ -3,11 +3,29 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from payment.app.db.postgresql import SessionDep
-from payment.app.models.models import Order, OrderRequest, UpdateOrder
+from payment.app.models.models import (
+    CheckoutValidationRequest,
+    CheckoutValidationResponse,
+    Order,
+    OrderRequest,
+    UpdateOrder,
+)
 from payment.app.services.process_service import ProcessService
 from payment.app.services.service import OrderService
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
+
+
+@router.post("/validate", response_model=CheckoutValidationResponse)
+async def validate_checkout(payload: CheckoutValidationRequest):
+    """
+    Pre-payment validation gate:
+    Validates cart items against the live inventory for:
+    1. Stock sufficiency (alerts if requested quantity exceeds current stock).
+    2. Price fluctuations (alerts if prices hiked or dropped since item was added to cart).
+    Computes updated base price and 1.5% platform fee.
+    """
+    return await OrderService.validate_checkout_items(payload.items)
 
 
 @router.post("/", response_model=Order)

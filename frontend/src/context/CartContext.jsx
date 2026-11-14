@@ -85,6 +85,29 @@ export const CartProvider = ({ children }) => {
     setCartItems(prev => prev.filter(item => item.id !== productId))
   }
 
+  const updateItemPrice = (productId, newPrice) => {
+    setCartItems(prev =>
+      prev.map(item =>
+        item.id === productId ? { ...item, price: parseFloat(newPrice) || item.price } : item
+      )
+    )
+  }
+
+  const syncCartItem = (productId, { price, availableStock, quantity }) => {
+    setCartItems(prev =>
+      prev.map(item => {
+        if (item.id === productId) {
+          const updated = { ...item }
+          if (price !== undefined) updated.price = parseFloat(price) || item.price
+          if (availableStock !== undefined) updated.availableStock = parseInt(availableStock, 10)
+          if (quantity !== undefined) updated.quantity = parseInt(quantity, 10)
+          return updated
+        }
+        return item
+      })
+    )
+  }
+
   const clearCart = () => {
     setCartItems([])
   }
@@ -126,6 +149,8 @@ export const CartProvider = ({ children }) => {
         addToCart,
         updateQuantity,
         removeFromCart,
+        updateItemPrice,
+        syncCartItem,
         clearCart,
         totalItems,
         subtotal,

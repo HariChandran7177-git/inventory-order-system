@@ -1,7 +1,5 @@
-import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCart } from "../context/CartContext"
-import { paymentApi } from "../api/client"
 import { formatPrice } from "../utils/formatters"
 
 export const CartDrawer = () => {
@@ -11,7 +9,6 @@ export const CartDrawer = () => {
     setIsCartOpen,
     updateQuantity,
     removeFromCart,
-    clearCart,
     subtotal,
     subtotalWithoutGst,
     includedGst,
@@ -19,51 +16,12 @@ export const CartDrawer = () => {
     grandTotal,
   } = useCart()
 
-  const [checkingOut, setCheckingOut] = useState(false)
-  const [checkoutError, setCheckoutError] = useState(null)
-  const [completedOrders, setCompletedOrders] = useState(null)
   const navigate = useNavigate()
 
   if (!isCartOpen) return null
 
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) return
-    setCheckingOut(true)
-    setCheckoutError(null)
-
-    const created = []
-    const errors = []
-
-    for (const item of cartItems) {
-      try {
-        const order = await paymentApi.createOrder({
-          product_id: item.id,
-          order_quantity: item.quantity,
-        })
-        created.push(order)
-      } catch (err) {
-        errors.push(`${item.name}: ${err.message}`)
-      }
-    }
-
-    setCheckingOut(false)
-
-    if (errors.length > 0) {
-      setCheckoutError(errors.join(" | "))
-      if (created.length > 0) {
-        // Remove successfully ordered items from cart
-        created.forEach(order => removeFromCart(order.product_id))
-      }
-    } else {
-      clearCart()
-      setCompletedOrders(created)
-    }
-  }
-
   const handleClose = () => {
     setIsCartOpen(false)
-    setCheckoutError(null)
-    setCompletedOrders(null)
   }
 
   return (
@@ -98,62 +56,11 @@ export const CartDrawer = () => {
             className="btn-close"
             aria-label="Close"
             onClick={handleClose}
-            disabled={checkingOut}
           ></button>
         </div>
 
         <div className="offcanvas-body flex-grow-1 p-3" style={{ overflowY: "auto" }}>
-          {checkoutError && (
-            <div className="alert alert-danger alert-dismissible fade show" role="alert">
-              <strong>Checkout issue:</strong> {checkoutError}
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setCheckoutError(null)}
-              ></button>
-            </div>
-          )}
-
-          {completedOrders ? (
-            <div className="text-center py-4">
-              <div className="text-success mb-3">
-                <i className="bi bi-check-circle-fill display-3"></i>
-              </div>
-              <h4 className="fw-bold mb-2">Order Placed Successfully!</h4>
-              <p className="text-muted mb-4">
-                Thank you for your purchase. Your order has been registered and is being processed.
-              </p>
-              <div className="bg-light p-3 rounded mb-4 text-start small">
-                <strong>Confirmed Order IDs:</strong>
-                <ul className="mb-0 mt-1 ps-3">
-                  {completedOrders.map(order => (
-                    <li key={order.order_id}>
-                      Order #{order.order_id} &mdash; Total: {formatPrice(order.total)} ({order.status})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="d-grid gap-2">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    handleClose()
-                    navigate("/orders")
-                  }}
-                >
-                  <i className="bi bi-receipt me-1"></i> View Order History
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={handleClose}
-                >
-                  Continue Shopping
-                </button>
-              </div>
-            </div>
-          ) : cartItems.length === 0 ? (
+          {cartItems.length === 0 ? (
             <div className="text-center py-5 text-muted">
               <i className="bi bi-cart-x display-4 text-secondary mb-3 d-block"></i>
               <h5>Your cart is currently empty</h5>
@@ -179,7 +86,6 @@ export const CartDrawer = () => {
                       className="btn btn-link text-danger p-0 border-0"
                       title="Remove item"
                       onClick={() => removeFromCart(item.id)}
-                      disabled={checkingOut}
                     >
                       <i className="bi bi-trash"></i>
                     </button>
@@ -196,7 +102,7 @@ export const CartDrawer = () => {
                         className="btn btn-outline-secondary"
                         type="button"
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        disabled={checkingOut || item.quantity <= 1}
+                        disabled={item.quantity <= 1}
                       >
                         -
                       </button>
@@ -207,7 +113,7 @@ export const CartDrawer = () => {
                         className="btn btn-outline-secondary"
                         type="button"
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={checkingOut || (item.availableStock && item.quantity >= item.availableStock)}
+                        disabled={item.availableStock && item.quantity >= item.availableStock}
                       >
                         +
                       </button>
@@ -224,7 +130,7 @@ export const CartDrawer = () => {
           )}
         </div>
 
-        {!completedOrders && cartItems.length > 0 && (
+        {cartItems.length > 0 && (
           <div className="border-top p-3 bg-light">
             <div className="d-flex justify-content-between small text-muted mb-1">
               <span>Price (excl. 5% GST)</span>
@@ -249,19 +155,12 @@ export const CartDrawer = () => {
             <button
               type="button"
               className="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
-              onClick={handleCheckout}
-              disabled={checkingOut}
+              onClick={() => {
+                handleClose()
+                navigate("/checkout")
+              }}
             >
-              {checkingOut ? (
-                <>
-                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                  Processing Orders...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-credit-card-2-front"></i> Complete Checkout
-                </>
-              )}
+              <i className="bi bi-shield-check"></i> Proceed to Checkout &amp; Pay
             </button>
           </div>
         )}

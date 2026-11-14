@@ -112,3 +112,37 @@ class OrderRequest(BaseModel):
             ]
         }
     }
+
+
+class CheckoutItemValidation(BaseModel):
+    product_id: str = pydantic.Field(..., description="Product ID to validate")
+    order_quantity: int = pydantic.Field(..., gt=0, description="Quantity requested")
+    client_price: float = pydantic.Field(..., ge=0.0, description="Current price on customer's client")
+
+
+class CheckoutValidationRequest(BaseModel):
+    items: list[CheckoutItemValidation] = pydantic.Field(..., description="List of cart items to validate")
+
+
+class ItemValidationResult(BaseModel):
+    product_id: str
+    name: str = ""
+    requested_quantity: int
+    available_stock: int
+    has_sufficient_stock: bool
+    client_price: float
+    current_price: float
+    price_difference: float
+    price_change_type: str  # "hike" | "drop" | "none"
+    status: str  # "ok" | "price_changed" | "insufficient_stock" | "not_found"
+
+
+class CheckoutValidationResponse(BaseModel):
+    is_valid: bool
+    has_stock_issues: bool
+    has_price_changes: bool
+    items: list[ItemValidationResult]
+    updated_subtotal: float
+    updated_platform_fee: float
+    updated_total: float
+

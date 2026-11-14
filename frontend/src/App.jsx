@@ -6,6 +6,7 @@ import { Products } from "./components/products"
 import { ProductsCreate } from "./components/products_create"
 import { ProductEdit } from "./components/ProductEdit"
 import { Orders } from "./components/Orders"
+import { Checkout } from "./components/Checkout"
 import { NotFound } from "./components/NotFound"
 
 function App() {
@@ -16,6 +17,10 @@ function App() {
           <Routes>
             {/* Customer Storefront */}
             <Route path="/" element={<ProductsStore />} />
+
+            {/* Two-Step Checkout & Payment Flow */}
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/payment" element={<Navigate to="/checkout" replace />} />
 
             {/* Admin Inventory Management */}
             <Route path="/admin" element={<Products />} />

@@ -122,7 +122,51 @@ Interactive Swagger / OpenAPI interfaces are available at:
 
 ---
 
-### 2.2 List Orders
+### 2.2 Pre-Payment Checkout Validation
+- **Endpoint:** `POST /orders/validate`
+- **Description:** Pre-payment validation gate between Step 1 (Review) and Step 2 (Payment). Validates all cart items against live inventory for stock sufficiency and price fluctuations (price hike or price drop).
+- **Request Body:**
+```json
+{
+  "items": [
+    {
+      "product_id": "01JBMX9Q3Y4ABCDEF123456789",
+      "order_quantity": 2,
+      "client_price": 100.0
+    }
+  ]
+}
+```
+- **Response:** `200 OK`
+```json
+{
+  "is_valid": true,
+  "has_stock_issues": false,
+  "has_price_changes": false,
+  "items": [
+    {
+      "product_id": "01JBMX9Q3Y4ABCDEF123456789",
+      "name": "Wireless Mechanical Keyboard",
+      "requested_quantity": 2,
+      "available_stock": 10,
+      "has_sufficient_stock": true,
+      "client_price": 100.0,
+      "current_price": 100.0,
+      "price_difference": 0.0,
+      "price_change_type": "none",
+      "status": "ok"
+    }
+  ],
+  "updated_subtotal": 200.0,
+  "updated_platform_fee": 3.0,
+  "updated_total": 203.0
+}
+```
+*(If stock is insufficient, `has_sufficient_stock: false` and `status: "insufficient_stock"`. If price changed, `price_change_type: "hike"` or `"drop"` with the delta `price_difference`).*
+
+---
+
+### 2.3 List Orders
 - **Endpoint:** `GET /orders/`
 - **Response:** `200 OK` (Array of SQLModel orders sorted by `order_id` descending)
 ```json

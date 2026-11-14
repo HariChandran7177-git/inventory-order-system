@@ -124,6 +124,25 @@ export const paymentApi = {
     return request(`${PAYMENT_BASE_URL}/orders/`)
   },
 
+  async validateCheckout(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("Validation requires a non-empty list of cart items")
+    }
+
+    const payload = {
+      items: items.map(item => ({
+        product_id: String(item.id || item.product_id).trim(),
+        order_quantity: parseInt(item.quantity || item.order_quantity, 10),
+        client_price: parseFloat(item.price || item.client_price || 0),
+      })),
+    }
+
+    return request(`${PAYMENT_BASE_URL}/orders/validate`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+
   async getOrder(orderId) {
     if (!orderId) throw new Error("Order ID is required")
     return request(`${PAYMENT_BASE_URL}/orders/${orderId}`)
