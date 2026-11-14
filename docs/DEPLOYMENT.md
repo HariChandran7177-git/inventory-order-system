@@ -2,7 +2,7 @@
 
 ## Current status
 
-This repository is configured for local Docker Compose development. It is not production-ready for public deployment: no authentication/authorization, production database migrations, TLS/reverse proxy, secrets manager, production container build for the SPA, or production orchestration is configured. `/health` currently checks only that the API process responds.
+This repository is configured for local development. It is not production-ready for public deployment: no authentication/authorization, production database migrations, TLS/reverse proxy, secrets manager, production build for the SPA, or orchestration is configured. `/health` currently checks only that the API process responds.
 
 There is no Netlify configuration in the repository and no connected Netlify tool/account in the current session. Netlify can serve the static frontend, but it cannot by itself provide the Redis instance, PostgreSQL database, two persistent FastAPI APIs, and two stream consumers required by the current application. Deploying only the static page would not make catalog/order functions work.
 
@@ -10,7 +10,7 @@ There is no Netlify configuration in the repository and no connected Netlify too
 
 Build using `npm ci` then `npm run build:frontend`; Vite outputs `frontend/dist`. Configure `VITE_API_URL` and `VITE_PAYMENT_API_URL` at build time to HTTPS production API origins. These values are public. Configure SPA fallback/rewrite so unknown paths serve `/index.html` (the app uses BrowserRouter). Configure API CORS allowlists for the exact deployed frontend origin.
 
-The current root Docker Compose frontend is a Vite development server and must not be used as the production static serving strategy. Bootstrap CSS/JS and icons are bundled from local npm dependencies, so the frontend does not depend on a runtime asset CDN.
+The local frontend runs a Vite development server and must be built (`npm run build:frontend`) before static production hosting. Bootstrap CSS/JS and icons are bundled from local npm dependencies, so the frontend does not depend on a runtime asset CDN.
 
 ## Backend and data requirements
 

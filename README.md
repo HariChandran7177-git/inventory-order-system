@@ -2,7 +2,7 @@
 
 # ⚡ Inventory Order System
 
-### _Event-Driven Distributed Microservices E-Commerce Platform_
+### _Event-Driven Distributed Microservices Platform_
 
 [![Tests](<https://img.shields.io/badge/Tests-64%2F64%20Passing%20(100%25)-success?style=for-the-badge&logo=pytest&logoColor=white>)](#-testing--quality-assurance)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -11,98 +11,78 @@
 [![Redis](https://img.shields.io/badge/Redis-Streams%20%26%20OM-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Compose%20Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](./LICENSE)
 
 <p align="center">
-  A high-throughput, event-driven e-commerce microservices platform demonstrating <b>domain decomposition</b>, <b>asynchronous choreography sagas</b>, <b>atomic Lua stock decrements</b>, <b>Redis Streams message brokering</b>, and a responsive <b>React 19 storefront</b>.
+  A high-throughput, event-driven e-commerce microservices platform demonstrating <b>domain decomposition</b>, <b>asynchronous choreography sagas</b>, <b>atomic Lua stock decrements for zero overselling</b>, <b>Redis Streams message brokering</b>, and a modern <b>React 19 storefront</b>.
 </p>
 
 [Architecture](#-system-architecture--service-topology) •
-[Data Flow & Saga](#-choreography-saga--event-driven-lifecycle) •
-[Workflows & Quickstart](#-workflows--quickstart-guide) •
+[Choreography Saga](#-choreography-saga--event-driven-lifecycle) •
+[Quickstart](#-quickstart-guide-local-development) •
 [API Reference](#-api-endpoints-reference) •
 [Testing & QA](#-testing--quality-assurance) •
-[Documentation](#-technical-documentation)
+[Interview Guide](./docs/INTERVIEW_GUIDE.md)
 
 ---
 
 </div>
 
-## 📖 Executive Summary
+## 📌 Project Overview
 
-Modern e-commerce platforms require ultra-low latency for browsing massive product catalogs while strictly maintaining transactional consistency and zero overselling during high-concurrency burst events (e.g. flash sales).
-
-**Inventory Order System** solves this challenge through clear service boundary isolation and asynchronous event choreography:
-
-1. **Inventory Service (Port 8000)**: Optimized for blazing-fast catalog reads. Backed by **Redis OM HashModels** and **FastAPICache** (Cache-Aside, 600s TTL). Pipelined batch queries eliminate $N+1$ roundtrip latency.
-2. **Payment Service (Port 8001)**: Governs order creation, 1.5% platform fee calculations (with 5% included GST pricing breakdown), and transaction records. Backed by **PostgreSQL 16** via **SQLModel** with async connection pooling (`asyncpg`).
-3. **Redis Event Bus (Port 6379)**: Provides decoupled, asynchronous pub/sub messaging via **Redis Streams** (`order_completed` and `refund_order`) with persistent consumer groups.
-4. **Autonomous Stream Workers**: Background daemon workers consume stream events, execute concurrency-safe **Redis Lua scripts** (`LUA_ATOMIC_DECREMENT`) to guarantee zero race-condition overselling, and autonomously recover pending messages on startup via **Pending Entries List (PEL)** auto-claim.
-5. **Customer & Admin Storefront (Port 3000)**: A modern **React 19** single-page application built with **Vite** and **Bootstrap 5**, featuring a live catalog grid, offcanvas cart drawer, admin inventory CRUD, order lifecycle tracking, and global React `ErrorBoundary` safety.
+1. **What It Is:** A decoupled e-commerce platform splitting catalog browsing from order processing into independent microservices.
+2. **The Problem It Solves:** Prevents **inventory overselling during flash sales** when multiple concurrent users purchase limited stock at the exact same millisecond.
+3. **How It Works:** Uses an **atomic Redis Lua script** for single-operation stock validation and decrements, combined with **Redis Streams** for asynchronous order fulfillment.
+4. **Transparent Pricing:** Features an itemized financial breakdown: base price excluding 5% GST tax, included 5% GST, and a 1.5% platform fee.
+5. **Modern Frontend:** Built with **React 19** and **Bootstrap 5**, providing a real-time storefront, offcanvas cart drawer, admin inventory management, and order history tracking.
 
 ---
 
 ## 🏛️ System Architecture & Service Topology
 
-```mermaid
-flowchart TD
-    subgraph ClientLayer ["Client Layer (Port 3000)"]
-        SPA["React 19 Single Page App<br/>(Storefront, Cart Drawer, Admin, Orders)"]
-    end
-
-    subgraph APILayer ["REST Microservices Layer"]
-        InvAPI["Inventory API (Port 8000)<br/>FastAPI / Uvicorn"]
-        PayAPI["Payment API (Port 8001)<br/>FastAPI / Uvicorn"]
-    end
-
-    subgraph StorageLayer ["Dedicated Datastores & Event Bus"]
-        RedisDB[("Redis 7.2 In-Memory DB (Port 6379)<br/>• Redis OM Hashes (Catalog)<br/>• FastAPICache (600s TTL)<br/>• Redis Streams (Event Bus)")]
-        PostgresDB[("PostgreSQL 16 (Port 5432)<br/>• Orders Ledger Table<br/>• ACID Transactions")]
-    end
-
-    subgraph WorkerLayer ["Autonomous Background Event Consumers"]
-        InvWorker["Inventory Consumer Worker<br/>• Group: inventory_group<br/>• Atomic Lua Stock Decrement<br/>• Startup PEL Auto-Claim"]
-        PayWorker["Payment Consumer Worker<br/>• Group: payment_group<br/>• Order Compensation (Refund)<br/>• Startup PEL Auto-Claim"]
-    end
-
-    %% Client Interactions
-    SPA -->|"HTTP REST (Catalog CRUD)"| InvAPI
-    SPA -->|"HTTP REST (Orders / Checkout)"| PayAPI
-
-    %% Inter-Service Communication
-    PayAPI -->|"HTTP GET /inventory/product/:id<br/>(Validate stock & price)"| InvAPI
-
-    %% Service to Storage Connections
-    InvAPI -->|"Redis OM Hashes & Cache"| RedisDB
-    PayAPI -->|"AsyncPG / SQLModel"| PostgresDB
-    PayAPI -->|"XADD order_completed"| RedisDB
-
-    %% Event Stream Consumption
-    RedisDB -.->|"XREADGROUP order_completed"| InvWorker
-    InvWorker -->|"EVALSHA LUA_ATOMIC_DECREMENT"| RedisDB
-    InvWorker -.->|"XADD refund_order (on shortage)"| RedisDB
-    RedisDB -.->|"XREADGROUP refund_order"| PayWorker
-    PayWorker -->|"UPDATE Order status='refunded'"| PostgresDB
+```
++-----------------------------------------------------------------------------------+
+|                                 CUSTOMER BROWSER                                  |
+|                             React 19 + Vite (Port 3000)                           |
++-----------------------------------------------------------------------------------+
+           |                                                      |
+           | HTTP (Catalog & Admin CRUD)                          | HTTP (Checkout & Orders)
+           v                                                      v
++-------------------------------+              +------------------------------------+
+|     INVENTORY SERVICE         |              |          PAYMENT SERVICE           |
+|      FastAPI (Port 8000)      | <----------- |        FastAPI (Port 8001)         |
++-------------------------------+  Validate    +------------------------------------+
+  |                           |    Stock &       |                                |
+  | Read/Write                |    Price         | Read/Write                     | Publish
+  v                           |                  v                                v
++------------------+          |        +--------------------+          +--------------------+
+|  REDIS OM CACHE  |          |        |   POSTGRESQL 16    |          |   REDIS STREAMS    |
+| (600s TTL-Aside) |          |        |  (Orders Ledger)   |          | (order_completed)  |
++------------------+          |        +--------------------+          +--------------------+
+                              |                                                   |
+                              | Consume & Atomic Decrement                        | Consume Refund
+                              v                                                   v
+                   +---------------------+                             +--------------------+
+                   |  INVENTORY WORKER   |                             |   PAYMENT WORKER   |
+                   | (Lua Script atomic) | --------------------------> | (Status = Refund)  |
+                   +---------------------+     Publish refund_order    +--------------------+
 ```
 
-### Container Topology & Port Allocation
+### Service Topology & Port Allocation
 
-| Component            | Container Name                       | Host Port | Internal Port | Technology           | Purpose                                           |
-| :------------------- | :----------------------------------- | :-------: | :-----------: | :------------------- | :------------------------------------------------ |
-| **Frontend SPA**     | `inventory-order-frontend`           |  `3000`   |    `3000`     | React 19 / Vite      | Storefront, cart, admin CRUD, order history       |
-| **Inventory API**    | `inventory-order-inventory-api`      |  `8000`   |    `8000`     | FastAPI / Uvicorn    | Catalog management, Redis OM, FastAPICache        |
-| **Payment API**      | `inventory-order-payment-api`        |  `8001`   |    `8001`     | FastAPI / Uvicorn    | Order creation, fee calculation, stream publisher |
-| **Inventory Worker** | `inventory-order-inventory-consumer` |     —     |       —       | Python / Redis TCP   | Atomic Lua stock decrement, stream ACK            |
-| **Payment Worker**   | `inventory-order-payment-consumer`   |     —     |       —       | Python / SQLModel    | Refund compensation handler                       |
-| **Redis Event Bus**  | `inventory-order-redis`              |  `6379`   |    `6379`     | Redis 7.2 Alpine     | Catalog storage, API caching, event streams       |
-| **PostgreSQL DB**    | `inventory-order-postgres`           |  `5432`   |    `5432`     | PostgreSQL 16 Alpine | Relational orders ledger, ACID persistence        |
+| Component | Port | Technology | Purpose | Documentation |
+| :--- | :---: | :--- | :--- | :--- |
+| **Storefront & Admin SPA** | `3000` | React 19, Vite, Bootstrap 5 | Catalog browsing, offcanvas cart, admin inventory, order history | [Frontend README](./frontend/README.md) |
+| **Inventory Microservice** | `8000` | FastAPI, Redis OM, FastAPICache | Sub-millisecond catalog reads, cache invalidation, stock governance | [Inventory README](./backend/inventory/README.md) |
+| **Payment Microservice** | `8001` | FastAPI, SQLModel, PostgreSQL 16 | Order creation, fee/tax calculations, transactional order ledger | [Payment README](./backend/payment/README.md) |
+| **Inventory Consumer** | — | Python daemon, Redis Lua | Consumes `order_completed`, executes atomic stock decrement | [Worker Docs](./docs/ARCHITECTURE.md) |
+| **Payment Consumer** | — | Python daemon, SQLModel | Consumes `refund_order`, marks orders as `refunded` | [Worker Docs](./docs/ARCHITECTURE.md) |
+| **Redis Cache & Broker** | `6379` | Redis 7 | In-memory catalog, FastAPICache (600s TTL), event streams | [Redis Config](./docs/SETUP.md) |
+| **PostgreSQL Database** | `5432` | PostgreSQL 16 | Relational orders persistence, connection pooling via AsyncPG | [Database Schema](./docs/ARCHITECTURE.md) |
 
 ---
 
 ## 🔄 Choreography Saga & Event-Driven Lifecycle
-
-The platform uses a distributed **Choreography Saga** to decouple orders from catalog mutations while guaranteeing eventual consistency:
 
 ```mermaid
 sequenceDiagram
@@ -113,54 +93,73 @@ sequenceDiagram
     participant InvAPI as Inventory API (Port 8000)
     participant PG as PostgreSQL (Port 5432)
     participant RStream as Redis Stream (Port 6379)
-    participant InvWorker as Inventory Worker
-    participant PayWorker as Payment Worker
+    participant InvWorker as Inventory Stream Worker
 
-    %% Order Placement
     Customer->>FE: Click "Checkout" (Qty: 2, Product: P101)
     FE->>PayAPI: POST /orders/ {product_id: "P101", order_quantity: 2}
     PayAPI->>InvAPI: GET /inventory/product/P101 (Validate stock & price)
-    InvAPI-->>PayAPI: 200 OK {price: 50.00, quantity: 10}
-    Note over PayAPI: Calculate 1.5% Fee ($0.75/unit)<br/>Compute Total: (50 + 0.75) * 2 = $101.50
-    PayAPI->>PG: INSERT INTO orders (status='pending', total=101.50)
-    PG-->>PayAPI: Order committed (order_id: 888)
-    PayAPI->>RStream: XADD order_completed {order_id: 888, qty: 2, prod: P101}
-    PayAPI-->>FE: 200 OK {order_id: 888, status: 'pending', total: 101.50}
+    InvAPI-->>PayAPI: 200 OK {price: 100.00, quantity: 10}
+    Note over PayAPI: Calculate 1.5% Fee ($1.50/unit)<br/>Compute Total: (100 + 1.50) * 2 = $203.00
+    PayAPI->>PG: INSERT INTO orders (status='pending', total=203.00)
+    PG-->>PayAPI: Order committed (order_id: 101)
+    PayAPI->>RStream: XADD order_completed {order_id: 101, qty: 2, prod: P101}
+    PayAPI-->>FE: 200 OK {order_id: 101, status: 'pending', total: 203.00}
     FE-->>Customer: Display Order Confirmation (Pending)
 
     %% Async Background Processing
-    RStream->>InvWorker: XREADGROUP order_completed (Msg ID: 171000-0)
+    RStream->>InvWorker: XREADGROUP order_completed
     Note over InvWorker: Execute Atomic Redis Lua Script<br/>(Verifies stock >= 2 and decrements HSET)
     alt Stock Available (Happy Path)
-        InvWorker->>RStream: XACK order_completed inventory_group 171000-0
-        Note over InvWorker: Invalidate Redis Cache namespaces
-    else Stock Depleted by Race Condition (Compensation Flow)
-        InvWorker->>RStream: XADD refund_order {order_id: 888, status: 'refunded'}
-        InvWorker->>RStream: XACK order_completed inventory_group 171000-0
-        RStream->>PayWorker: XREADGROUP refund_order
-        PayWorker->>PG: UPDATE orders SET status='refunded' WHERE order_id=888
-        PayWorker->>RStream: XACK refund_order payment_group
+        InvWorker->>RStream: XACK order_completed inventory_group
+    else Stock Depleted (Compensation Path)
+        InvWorker->>RStream: XADD refund_order {order_id: 101}
+        InvWorker->>RStream: XACK order_completed inventory_group
     end
 ```
 
-### Why Atomic Lua Scripting Matters
+---
 
-In high-throughput environments, standard Python read-then-write loops (`product.quantity -= qty; product.save()`) suffer from race conditions that cause overselling. Fast-Cart executes an atomic Lua script directly inside Redis's single-threaded command processor:
+## 🛡️ Zero Overselling: The Atomic Redis Lua Script
 
-1. Validates product existence (`HEXISTS`).
-2. Checks stock adequacy (`current_qty >= order_qty`).
-3. Decrements and persists atomically (`HSET`).
-4. Returns exact exit codes: `1` (Success), `0` (Missing item), `-2` (Shortage).
+Under high concurrency, traditional application code that reads stock in one query and decrements in another suffers from race conditions. This project guarantees data integrity by delegating the check and decrement to an **indivisible Redis Lua script**:
+
+```lua
+local current = redis.call('HGET', KEYS[1], 'quantity')
+if not current then
+    return -2 -- Product not found
+end
+local stock = tonumber(current)
+local requested = tonumber(ARGV[1])
+if stock >= requested then
+    redis.call('HSET', KEYS[1], 'quantity', stock - requested)
+    return stock - requested -- Success: returns remaining stock
+else
+    return -1 -- Insufficient stock (triggers saga compensation)
+end
+```
+
+Because Redis evaluates Lua scripts atomically in a single thread, **no other read or write can interleave**, guaranteeing zero overselling.
 
 ---
 
-## 📂 Repository Architecture
+## 💰 Fee & Tax Calculation Model
+
+All product prices use this transparent computation:
+
+$$\text{Price (excl. 5\% GST)} = \text{round}\left(\frac{\text{Price}}{1.05}, 2\right)$$
+
+$$\text{Included 5\% GST} = \text{round}\left(\text{Price} - \text{Price (excl. GST)}, 2\right)$$
+
+$$\text{Platform Fee (1.5\%)} = \text{round}(0.015 \times \text{Price}, 2)$$
+
+$$\text{Total Amount} = (\text{Price} + \text{Platform Fee}) \times \text{Quantity}$$
+
+---
+
+## 📂 Repository Directory Structure
 
 ```
 inventory-order-system/
-├── .github/
-│   └── workflows/
-│       └── ci.yml                  # GitHub Actions CI (linting, tests, build)
 ├── backend/
 │   ├── inventory/                  # Inventory Catalog Microservice (Port 8000)
 │   │   ├── app/
@@ -171,8 +170,7 @@ inventory-order-system/
 │   │   │   ├── services/           # Pipelined batching & cache invalidation
 │   │   │   ├── workers/consumer.py # Redis Stream consumer with atomic Lua decrement
 │   │   │   └── main.py             # FastAPI entrypoint, lifespan context & CORS
-│   │   ├── .dockerignore           # Container build exclusions
-│   │   ├── Dockerfile              # Inventory microservice container
+│   │   ├── README.md               # Dedicated Inventory Service documentation
 │   │   └── requirements.txt        # Pinned service dependencies
 │   └── payment/                    # Payment & Orders Microservice (Port 8001)
 │       ├── app/
@@ -183,8 +181,7 @@ inventory-order-system/
 │       │   ├── services/           # 1.5% platform fee calc, stock check, SQL .returning()
 │       │   ├── workers/consumer.py # Asynchronous refund compensation consumer
 │       │   └── main.py             # FastAPI entrypoint, lifespan context & CORS
-│       ├── .dockerignore           # Container build exclusions
-│       ├── Dockerfile              # Payment microservice container
+│       ├── README.md               # Dedicated Payment Service documentation
 │       └── requirements.txt        # Pinned service dependencies
 ├── frontend/                       # React 19 + Vite Single Page Application (Port 3000)
 │   ├── src/
@@ -195,8 +192,7 @@ inventory-order-system/
 │   │   ├── App.jsx                 # Client-side routing configuration
 │   │   ├── index.css               # Clean styling (Bootstrap 5.3 + custom theme)
 │   │   └── main.jsx                # Application root with React Error Boundary
-│   ├── .dockerignore               # Container build exclusions
-│   ├── Dockerfile                  # Vite development container
+│   ├── README.md                   # Dedicated Frontend documentation
 │   ├── package.json                # React 19, React Router 7, Bootstrap 5 dependencies
 │   └── vite.config.js              # Vite server configuration (host 0.0.0.0, port 3000)
 ├── tests/                          # 4-Tier Automated Test Suite (64 Passing Tests)
@@ -204,94 +200,72 @@ inventory-order-system/
 │   ├── integration/                # Inter-service flows & Redis Stream worker processing
 │   ├── e2e/                        # Full shopping journey, concurrency stress & PEL
 │   ├── conftest.py                 # Isolated test fixtures (fakeredis, MockAsyncSession)
-│   ├── test_inventory_route.py     # Refactored inventory route tests
-│   └── test_payment_route.py       # Refactored payment route tests
+│   ├── test_inventory_route.py     # Inventory route test cases
+│   └── test_payment_route.py       # Payment route test cases
 ├── docs/                           # Centralized Technical Documentation
-│   ├── ARCHITECTURE.md             # System architecture and Mermaid flow diagrams
-│   ├── API.md                      # Inventory and payment REST endpoint reference
-│   ├── SETUP.md                    # Local run and offline setup instructions
-│   ├── TESTING.md                  # Test suite documentation & tier breakdown
-│   └── DEPLOYMENT.md               # Production requirements & limitations
-├── .dockerignore                   # Monorepo container build exclusions
-├── .env.example                    # Exhaustive environment variable configuration
-├── docker-compose.yml              # 7-service orchestration with healthchecks
-├── Dockerfile                      # Reference monorepo container image
+│   ├── ARCHITECTURE.md             # System architecture & distributed patterns
+│   ├── API.md                      # Complete REST endpoint specifications & schemas
+│   ├── SETUP.md                    # Step-by-step local installation & runbook
+│   ├── TESTING.md                  # Test suite architecture & coverage breakdown
+│   ├── DEPLOYMENT.md               # Production deployment requirements & hardening
+│   └── INTERVIEW_GUIDE.md          # 30 interview questions, 15 hard Qs & presentation scripts
+├── .env.example                    # Exhaustive environment variable template
 ├── LICENSE                         # MIT License
-├── package.json                    # Workspace root
+├── package.json                    # Monorepo root with dev & test scripts
 ├── package-lock.json               # Root lockfile
-└── requirements.txt                # Unified Python dependencies (runtime & testing)
+└── requirements.txt                # Unified Python dependencies
 ```
 
 ---
 
-## 🚀 Workflows & Quickstart Guide
+## 🚀 Quickstart Guide (Local Development)
 
-### Workflow 1: 1-Click Docker Compose (Recommended)
+### 1. Prerequisites
+- **Python 3.10+** (existing `.venv` is Python 3.11)
+- **Node.js 20+** and npm
+- **Redis server** running locally on port `6379`
+- **PostgreSQL server** running locally on port `5432`
 
-Docker Compose orchestrates all 7 services with automated container healthcheck probes (`condition: service_healthy`) ensuring databases are operational before APIs and workers launch.
+---
 
-```bash
-# 1. Clone the repository
+### 2. Installation
+
+```powershell
+# 1. Clone repository
 git clone https://github.com/HariChandran7177-git/inventory-order-system.git
 cd inventory-order-system
 
-# 2. Copy the environment template
-cp .env.example .env
+# 2. Setup Python virtual environment
+.\.venv\Scripts\activate   # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
 
-# 3. Start all services
-docker compose up --build -d
-
-# 4. Check service health
-docker compose ps
-```
-
-#### Application Endpoints
-
-- 🛒 **Customer Storefront**: [http://localhost:3000](http://localhost:3000)
-- 📦 **Admin Inventory Manager**: [http://localhost:3000/admin](http://localhost:3000/admin)
-- 📋 **Order History & Tracking**: [http://localhost:3000/orders](http://localhost:3000/orders)
-- 📑 **Inventory API Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 📑 **Payment API Swagger UI**: [http://localhost:8001/docs](http://localhost:8001/docs)
-
-```bash
-# View live streaming logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
+# 3. Setup Frontend dependencies
+npm install
 ```
 
 ---
 
-### Workflow 2: Native Local Development (Offline Mode)
+### 3. Launch Services (Separate Terminals)
 
-For local development without Docker:
+```powershell
+# Terminal 1: Inventory API (Port 8000)
+npm run dev:inventory
 
-```bash
-# 1. Setup Python Virtual Environment
-python -m venv .venv
-.\.venv\Scripts\activate   # Linux/macOS: source .venv/bin/activate
+# Terminal 2: Payment API (Port 8001)
+npm run dev:payment
 
-# 2. Install Dependencies
-pip install -r requirements.txt
-pip install -r requirements-testing.txt
-
-# 3. Launch Services (Separate Terminals)
-# Terminal 1: Inventory API
-uvicorn inventory.app.main:app --reload --port 8000
-
-# Terminal 2: Inventory Consumer Worker
-python -m inventory.app.workers.consumer
-
-# Terminal 3: Payment API
-uvicorn payment.app.main:app --reload --port 8001
-
-# Terminal 4: Payment Consumer Worker
-python -m payment.app.workers.consumer
-
-# Terminal 5: Frontend Vite Server
-npm --workspace=frontend run dev
+# Terminal 3: React Frontend Storefront (Port 3000)
+npm run dev:frontend
 ```
+
+*(Optional: Launch background workers with `npm run dev:inventory-worker` and `npm run dev:payment-worker`)*
+
+#### Endpoints
+- 🛒 **Customer Storefront:** [http://localhost:3000](http://localhost:3000)
+- 📦 **Admin Inventory Management:** [http://localhost:3000/admin](http://localhost:3000/admin)
+- 📋 **Order History & Tracking:** [http://localhost:3000/orders](http://localhost:3000/orders)
+- 📑 **Inventory Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- 📑 **Payment Swagger UI:** [http://localhost:8001/docs](http://localhost:8001/docs)
 
 ---
 
@@ -299,113 +273,101 @@ npm --workspace=frontend run dev
 
 ### 1. Inventory Service (Port 8000)
 
-|  Method  | Endpoint                  | Description                     | Cache Strategy                                   |
-| :------: | :------------------------ | :------------------------------ | :----------------------------------------------- |
-|  `GET`   | `/health`                 | Service health probe            | None                                             |
-|  `GET`   | `/inventory/products`     | Retrieve all catalog products   | FastAPICache (600s TTL, Redis pipeline batching) |
-|  `GET`   | `/inventory/product/{pk}` | Retrieve single product details | FastAPICache (`inventory.product:{pk}`)          |
-|  `POST`  | `/inventory/product`      | Create a new catalog product    | Invalidation (`inventory.products`)              |
-|  `PUT`   | `/inventory/product/{pk}` | Update price or stock quantity  | Invalidation (item & list namespaces)            |
-| `DELETE` | `/inventory/product/{pk}` | Delete product from catalog     | Invalidation (item & list namespaces)            |
-
-#### Create Product Example
-
-```bash
-curl -X POST http://localhost:8000/inventory/product \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Mechanical Keyboard RGB", "price": 129.99, "quantity": 25}'
-```
-
----
+| Method | Endpoint | Description | Cache Strategy |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/health` | Service health probe | None |
+| `GET` | `/inventory/products` | Retrieve all products (supports `?category=`) | FastAPICache (600s TTL) |
+| `GET` | `/inventory/product/{pk}` | Retrieve single product by PK | FastAPICache (`inventory.product:{pk}`) |
+| `POST` | `/inventory/product` | Create a new catalog product | Invalidation (`inventory.products`) |
+| `PUT` | `/inventory/product/{pk}` | Update name, price, stock, category | Invalidation (item & list) |
+| `DELETE` | `/inventory/product/{pk}` | Delete product from catalog | Invalidation (item & list) |
 
 ### 2. Payment Service (Port 8001)
 
-|  Method  | Endpoint             | Description                     | Processing Flow                                                                                |
-| :------: | :------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------- |
-|  `GET`   | `/health`            | Service health probe            | None                                                                                           |
-|  `GET`   | `/orders/`           | List all orders from PostgreSQL | SQLModel query ordered by ID                                                                   |
-|  `GET`   | `/orders/{order_id}` | Retrieve single order details   | Clean 404 if missing                                                                           |
-|  `POST`  | `/orders/`           | Place a new order               | Inventory HTTP check $\rightarrow$ 1.5% Fee $\rightarrow$ PostgreSQL $\rightarrow$ Redis Stream |
-|  `PUT`   | `/orders/{order_id}` | Update order status or total    | Single atomic SQL `.returning(Order)`                                                          |
-| `DELETE` | `/orders/{order_id}` | Delete order record             | PostgreSQL DELETE                                                                              |
-
-#### Place Order Example
-
-```bash
-curl -X POST http://localhost:8001/orders/ \
-  -H "Content-Type: application/json" \
-  -d '{"product_id": "01JBMX9Q3Y4ABCDEF123456789", "order_quantity": 2}'
-```
-
-_For complete schema specifications and request/response payloads, see [docs/API.md](./docs/API.md)._
+| Method | Endpoint | Description | Status Codes |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/health` | Service health probe | `200` |
+| `GET` | `/orders/` | List all orders from PostgreSQL | `200` |
+| `GET` | `/orders/{order_id}` | Retrieve single order details | `200`, `404` |
+| `POST` | `/orders/` | Place a new order (1.5% fee calculation) | `200`, `400`, `404`, `502` |
+| `PUT` | `/orders/{order_id}` | Update order status/total via `.returning()` | `200`, `404` |
+| `DELETE` | `/orders/{order_id}` | Delete / cancel order record | `200`, `404` |
 
 ---
 
 ## 🧪 Testing & Quality Assurance
 
-Inventory Order System features an automated **4-Tier Test Architecture** executed via `pytest`. Tests run **100% offline and isolated** using `fakeredis` with the `lupa` Lua engine and `MockAsyncSession` for PostgreSQL.
+The platform features an isolated **4-tier automated test suite** consisting of **64 tests** that execute in under 3 seconds using in-memory test doubles (**fakeredis** with **lupa** for real Lua execution and **MockAsyncSession** for SQLModel).
 
-### 4-Tier Test Pyramid
+Run the tests anytime without external databases:
 
-```
-                ▲
-               / \     Tier 4: Real-World Scenarios (7 Tests)
-              /   \    Full shopping journey, flash sale concurrency, PEL auto-claim
-             /-----\
-            /       \   Tier 3: Cross-Feature Workflows (11 Tests)
-           /         \  Inter-service validation, saga refund events, Lua stock decrements
-          /-----------\
-         /             \ Tier 2: Boundary & Corner Cases (14 Tests)
-        /               \ Quantities <= 0, negative prices, blank names, 404/422 guards
-       /-----------------\
-      /                   \ Tier 1: Feature Coverage (32 Tests)
-     /                     \ Product CRUD, Order lifecycle, 20% unit fee calc, /health
-    /-----------------------\
+```powershell
+npm test
 ```
 
-### Running Test Suites
+### Test Pyramid Breakdown
 
-```bash
-# Run all 64 automated backend tests
-pytest -q
-# Result: 64 passed in 0.84s (100% pass rate)
+```
+       / \
+      /   \      Tier 4: E2E Scenarios (5 tests)
+     / E2E \     - Full customer shopping journey, concurrency & PEL
+    /-------\
+   / Integr. \   Tier 3: Inter-Service Integration (7 tests)
+  /-----------\  - Cross-service checkout, cache invalidation, stream sagas
+ / Route & Life\ Tier 2: Route & Health (6 tests)
+/---------------\- HTTP 404/422 responses, lifespan & health probes
+/   Unit Tests  \Tier 1: Unit & Domain Logic (46 tests)
+/-----------------\- Fee precision, boundary checks, input validation
+```
 
-# Run frontend ESLint code quality
-npm --workspace=frontend run lint
-# Result: 0 errors, 0 warnings
+**Test Execution Output:**
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.2.0, pluggy-1.7.0
+rootdir: A:\Projects\inventory-order-system
+collected 64 items
 
-# Run frontend production bundle build
-npm run build:frontend
-# Result: Built cleanly in 1.35s
+tests\e2e\test_tier4_e2e_scenarios.py .....                              [  7%]
+tests\integration\test_stream_workers.py ....                            [ 14%]
+tests\integration\test_tier3_cross_features.py .......                   [ 25%]
+tests\test_inventory_route.py ..                                         [ 28%]
+tests\test_payment_route.py ....                                         [ 34%]
+tests\unit\test_fee_calculation.py .....                                 [ 42%]
+tests\unit\test_health_endpoints.py .....                                [ 50%]
+tests\unit\test_inventory_features.py ......                             [ 59%]
+tests\unit\test_inventory_input_validation.py ....                       [ 65%]
+tests\unit\test_payment_features.py ......                               [ 75%]
+tests\unit\test_stock_validation.py ......                               [ 84%]
+tests\unit\test_tier2_boundaries.py ..........                           [100%]
+
+====================== 64 passed, 428 warnings in 2.19s =======================
 ```
 
 ---
 
-## 📊 Current Project Status & Readiness
+## 📊 Project Status & Interview Readiness
 
-| Quality Metric                |       Status       | Assessment                                                                     |
-| :---------------------------- | :----------------: | :----------------------------------------------------------------------------- |
-| **Backend Test Suite**        |  `64 / 64 Passed`  | 100% pass rate across all 4 tiers without live external daemons.               |
-| **Frontend Code Quality**     |    `0 Warnings`    | Clean ESLint across all React 19 components and hooks.                         |
-| **Frontend Production Build** |  `Passed (1.35s)`  | Optimized Vite bundle with local Bootstrap 5.3 & Icons.                        |
-| **Container Orchestration**   | `Valid (0 Errors)` | Validated `docker-compose.yml` with healthchecks and dependencies.             |
-| **Concurrency & Integrity**   | `Zero Overselling` | Concurrency-safe atomic Lua decrement and startup PEL recovery.                |
-| **Production Readiness**      |  `Staging Ready`   | Ready for demo, portfolio, and staging. Requires JWT auth for public exposure. |
+| Quality Metric | Status | Assessment |
+| :--- | :---: | :--- |
+| **Backend Test Suite** | `64 / 64 Passed` | 100% pass rate across all 4 tiers without live external daemons. |
+| **Frontend Code Quality** | `0 Errors / Warnings` | Clean ESLint across all React 19 components and hooks. |
+| **Frontend Production Build** | `Passed (2.97s)` | Optimized Vite bundle with local Bootstrap 5.3 & Icons. |
+| **Concurrency & Integrity** | `Zero Overselling` | Concurrency-safe atomic Lua decrement and startup PEL recovery. |
+| **Interview Readiness** | `Complete` | Detailed architecture walkthrough, 30 Q&As, and elevator pitch ready. |
 
 ---
 
-## 📚 Technical Documentation
+## 📚 Technical Documentation Directory
 
-Comprehensive architectural and engineering guides are available in the [`docs/`](./docs) directory:
-
-- 🏛️ [**System Architecture & Topology**](./docs/ARCHITECTURE.md) — Detailed service map, data boundaries, and Mermaid sequence diagrams.
-- 📡 [**REST API Documentation**](./docs/API.md) — Full request/response schemas, path parameters, and status codes.
-- ⚙️ [**Local Setup & Runbook**](./docs/SETUP.md) — Environment variables, native installation, and troubleshooting.
-- 🧪 [**Testing Guide**](./docs/TESTING.md) — 4-tier testing pyramid specification and mock execution.
+- 🏛️ [**System Architecture & Topology**](./docs/ARCHITECTURE.md) — Service boundaries, saga patterns, and data consistency models.
+- 📡 [**REST API Documentation**](./docs/API.md) — Comprehensive schema specifications, headers, and error codes.
+- ⚙️ [**Local Setup & Runbook**](./docs/SETUP.md) — Step-by-step setup guide for native Windows, macOS, and Linux.
+- 🧪 [**Testing Guide**](./docs/TESTING.md) — 4-tier testing hierarchy and mock execution details.
 - 🚢 [**Deployment Guide**](./docs/DEPLOYMENT.md) — Production requirements, connection pooling, and security hardening.
+- 🎓 [**Interview Defense Manual**](./docs/INTERVIEW_GUIDE.md) — 30 interview questions, 15 hard Qs, elevator pitch, and resume points.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](./LICENSE). Open source and ready for portfolio showcase and technical interview defense.
+This project is licensed under the [MIT License](./LICENSE). Open source and ready for technical interview defense and portfolio presentation.

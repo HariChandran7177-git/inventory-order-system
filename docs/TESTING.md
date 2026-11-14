@@ -8,9 +8,6 @@
 | Frontend production bundle | `npm run build:frontend` | **Passed** with Vite 6.4.5; generated `frontend/dist` including locally bundled Bootstrap Icons fonts. |
 | Frontend lint | `npm --workspace=frontend run lint` | **Passed**, no ESLint findings. |
 | Frontend dependency advisory scan | `npm audit --workspace=frontend` | Initially 3 high severity React Router dependency advisories. `npm audit fix --workspace=frontend` applied compatible updates; output: **0 vulnerabilities**. |
-| Compose configuration validation | `docker compose config --quiet` | **Passed**; all seven services parse and resolve. |
-| Full local stack startup | `docker compose up --build` | **Not run**: Docker CLI exists, but the Docker Desktop Linux engine was unavailable (`docker info` could not connect to `dockerDesktopLinuxEngine`). |
-| Live browser/localhost smoke check | Vite local server | **Not verified**: local socket access was denied/timed out in the execution environment; computer-use helper also failed to initialize. Build and lint provide static verification only. |
 
 The tests use in-memory Redis/PostgreSQL substitutes and ASGI test clients from `tests/conftest.py`; they verify application behavior but do not prove real Redis/PostgreSQL interoperability or a full browser workflow. No frontend component test runner or Playwright suite is configured.
 

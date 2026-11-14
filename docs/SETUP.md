@@ -2,70 +2,58 @@
 
 ## Requirements
 
-- Python 3.10+ (the checked-in service images use Python 3.10; the existing local `.venv` is Python 3.11).
+- Python 3.10+ (existing local `.venv` uses Python 3.11).
 - Node.js 20+ and npm.
-- Docker Desktop with its Linux engine running for the complete stack.
+- Redis server running on `localhost:6379`.
+- PostgreSQL 16 server running on `localhost:5432`.
 
-## Start the complete local stack
+## Environment Setup
 
 From the repository root:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
+npm install
 ```
 
-Open the storefront at `http://localhost:3000`, inventory at `http://localhost:8000/docs`, and orders at `http://localhost:8001/docs`. The correct inventory administration route is `http://localhost:3000/admin`.
+## Running the Services
 
-Stop while retaining database volumes with `Ctrl+C` then `docker compose down`. To remove persisted local database data too, use `docker compose down -v` (destructive to local Redis/PostgreSQL data).
+Launch each service in a separate terminal:
 
-## Run frontend separately
-
+### 1. Inventory API (Port 8000)
 ```powershell
-npm ci
+npm run dev:inventory
+```
+Or directly: `.\.venv\Scripts\uvicorn.exe inventory.app.main:app --port 8000 --reload`
+
+### 2. Payment API (Port 8001)
+```powershell
+npm run dev:payment
+```
+Or directly: `.\.venv\Scripts\uvicorn.exe payment.app.main:app --port 8001 --reload`
+
+### 3. Frontend Storefront (Port 3000)
+```powershell
 npm run dev:frontend
 ```
 
-The frontend expects reachable APIs at `VITE_API_URL` (default `http://localhost:8000`) and `VITE_PAYMENT_API_URL` (default `http://localhost:8001`). Set those in `.env` before starting Vite; Vite variables are bundled into the browser and must not contain secrets.
+Open the storefront at `http://localhost:3000`, inventory docs at `http://localhost:8000/docs`, and payment docs at `http://localhost:8001/docs`. The admin inventory route is `http://localhost:3000/admin`.
 
-## Run API services as native processes
-
-Start Redis and PostgreSQL first (Compose is the supported local path):
-
-```powershell
-docker compose up -d redis postgres
-```
-
-In separate PowerShell windows, with the root `.venv` activated:
+### 4. Background Stream Workers (Optional)
+To run asynchronous event processing for Redis Streams:
 
 ```powershell
-$env:PYTHONPATH = "backend"
-python -m uvicorn inventory.app.main:app --host 127.0.0.1 --port 8000
+# Inventory consumer (stock decrement)
+npm run dev:inventory-worker
+
+# Payment consumer (refunds)
+npm run dev:payment-worker
 ```
 
-```powershell
-$env:PYTHONPATH = "backend"
-python -m uvicorn payment.app.main:app --host 127.0.0.1 --port 8001
-```
+## Environment and Credentials
 
-For the complete order lifecycle, also run workers in separate windows:
+`.env.example` provides local defaults. Copy it to `.env`, which is ignored by Git. The example PostgreSQL password is a development placeholder. There is no authentication configured for the APIs.
 
-```powershell
-$env:PYTHONPATH = "backend"
-python -m inventory.app.workers.consumer
-```
+## Connectivity and Offline Behavior
 
-```powershell
-$env:PYTHONPATH = "backend"
-python -m payment.app.workers.consumer
-```
-
-Install Python requirements with `python -m pip install -r requirements.txt -r requirements-testing.txt` when creating a fresh development environment. Compose is the recommended way to ensure Redis/PostgreSQL hostnames, ports, and service ordering are consistent.
-
-## Environment and local-only credentials
-
-`.env.example` provides local defaults. Copy it to `.env`, which is ignored by Git. The example PostgreSQL password is intentionally a development placeholder and must be replaced for any shared environment. There is no authentication configured for the APIs. See [Deployment](DEPLOYMENT.md) for production blockers.
-
-## Connectivity and offline behavior
-
-Bootstrap CSS/JavaScript and Bootstrap Icons are installed as npm dependencies and bundled by Vite; the app no longer fetches UI assets from a CDN. After dependencies and container images are installed, all application services can run locally without internet, provided the Docker engine is available. Product/order functions require the local Redis and PostgreSQL services. Browser API calls use configured local service URLs; there is no bundled API mock or fake data fallback. Dependency installation and fetching Docker images require internet (or a pre-populated local cache).
+Bootstrap CSS/JavaScript and Bootstrap Icons are installed as npm dependencies and bundled by Vite; the app does not fetch UI assets from a CDN. All application services run natively on local ports without internet once dependencies are installed.

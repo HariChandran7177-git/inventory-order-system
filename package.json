@@ -6,6 +6,11 @@
   ],
   "scripts": {
     "dev:frontend": "npm --workspace=frontend run dev",
-    "build:frontend": "npm --workspace=frontend run build"
+    "build:frontend": "npm --workspace=frontend run build",
+    "test": ".venv\\Scripts\\python.exe -m pytest",
+    "dev:inventory": ".venv\\Scripts\\uvicorn.exe inventory.app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:payment": ".venv\\Scripts\\uvicorn.exe payment.app.main:app --host 0.0.0.0 --port 8001 --reload",
+    "dev:inventory-worker": ".venv\\Scripts\\python.exe -m inventory.app.workers.consumer",
+    "dev:payment-worker": ".venv\\Scripts\\python.exe -m payment.app.workers.consumer"
   }
 }
